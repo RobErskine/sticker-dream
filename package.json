@@ -5,10 +5,11 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "server": "node --env-file=.env server.ts",
+    "server": "node --env-file=.env --watch server.ts",
     "gen": "node --env-file=.env index.ts",
     "print:example": "node --env-file=.env src/print-example.ts",
     "print:buffer": "node --env-file=.env src/print-buffer-example.ts",
+    "print:fix": "node --env-file=.env src/fix-paused-printer.ts",
     "gen:print": "node --env-file=.env src/generate-and-print.ts"
   },
   "keywords": [],

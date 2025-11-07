@@ -2,13 +2,15 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { cors } from 'hono/cors';
 import { GoogleGenAI } from "@google/genai";
-import { printToUSB } from './src/print.ts';
+import { printToUSB, watchAndResumePrinters } from './src/print.ts';
 
 const app = new Hono();
 const PORT = 3000;
 
 // Enable CORS for Vite dev server
 app.use('/*', cors());
+
+watchAndResumePrinters();
 
 // Initialize Google AI
 const ai = new GoogleGenAI({
@@ -31,6 +33,7 @@ async function generateImage(prompt: string): Promise<Buffer | null> {
     ${prompt}`,
     config: {
       numberOfImages: 1,
+      aspectRatio: "9:16"
     },
   });
 

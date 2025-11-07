@@ -15,6 +15,26 @@ const imageDisplay = document.querySelector('.image-display') as HTMLImageElemen
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
 
+// Check for microphone access before showing the button
+async function checkMicrophoneAccess() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Stop the stream immediately, we just needed to check permission
+    stream.getTracks().forEach(track => track.stop());
+
+    // Show the record button
+    recordBtn.style.display = 'block';
+    transcriptDiv.textContent = 'Ready to record!';
+  } catch (error) {
+    console.error('Microphone access denied:', error);
+    transcriptDiv.textContent = '❌ Microphone access required. Please enable microphone permissions in your browser settings.';
+    recordBtn.style.display = 'none';
+  }
+}
+
+// Check microphone access on load
+checkMicrophoneAccess();
+
 // Start recording when button is pressed down
 recordBtn.addEventListener('pointerdown', async () => {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
