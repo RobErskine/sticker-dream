@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Picture Wizard",
+    "slug": "picture-wizard",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "picturewizard",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFB3D9"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stickerdream.app",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Picture Wizard uses speech recognition to turn your voice into coloring pages.",
+        "NSMicrophoneUsageDescription": "Picture Wizard needs microphone access to hear what you want to draw.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFB3D9"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.stickerdream.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Picture Wizard needs microphone access to hear what you want to draw.",
+          "speechRecognitionPermission": "Picture Wizard uses speech recognition to turn your voice into coloring pages."
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f7182000-08bf-4f8b-b775-1b63ba510e8a"
+      }
+    }
+  }
+}

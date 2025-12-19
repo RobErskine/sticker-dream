@@ -1,0 +1,40 @@
+{
+  "name": "sticker-dream",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "build:ios": "eas build --platform ios",
+    "build:ios:dev": "eas build --profile development --platform ios",
+    "build:ios:preview": "eas build --platform ios --profile preview"
+  },
+  "dependencies": {
+    "@google/genai": "^1.31.0",
+    "expo": "~54.0.26",
+    "expo-av": "~16.0.7",
+    "expo-constants": "~18.0.10",
+    "expo-dev-client": "~6.0.19",
+    "expo-file-system": "~19.0.19",
+    "expo-haptics": "~15.0.7",
+    "expo-linking": "~8.0.9",
+    "expo-print": "~15.0.7",
+    "expo-router": "~6.0.16",
+    "expo-secure-store": "~15.0.7",
+    "expo-sharing": "~14.0.7",
+    "expo-speech-recognition": "^3.0.1",
+    "expo-status-bar": "~3.0.8",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
