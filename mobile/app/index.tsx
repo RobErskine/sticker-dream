@@ -14,6 +14,8 @@ import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useImageArchive } from '../hooks/useImageArchive';
 import { generateColoringPage } from '../services/imageGeneration';
 import { printImage } from '../services/printing';
+import { ImageActions } from '../components/ImageActions';
+import { AnimatedIconBackground, BACKGROUND_ICONS } from '../components/AnimatedBackgrounds';
 import { hasApiKey } from '../services/storage';
 import {
   playPressSound,
@@ -24,14 +26,31 @@ import {
 
 type AppStatus = 'idle' | 'listening' | 'processing' | 'success' | 'error' | 'cancelled';
 
+// Helper to format time ago
+function getTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+  if (seconds < 60) return 'Just now';
+  if (seconds < 120) return '1 minute ago';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+  if (seconds < 7200) return '1 hour ago';
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+  return `${Math.floor(seconds / 86400)} days ago`;
+}
+
 export default function HomeScreen() {
   const [appStatus, setAppStatus] = useState<AppStatus>('idle');
-  const [statusMessage, setStatusMessage] = useState('Press the button and tell Sticker Lizard what to draw!');
+  const [statusMessage, setStatusMessage] = useState('Press and hold the button and tell the \n Sticker Lizard what to draw!');
   const [currentImage, setCurrentImage] = useState<string | null>(null);
+  const [currentPrompt, setCurrentPrompt] = useState<string | null>(null);
+  const [currentImageId, setCurrentImageId] = useState<string | null>(null);
+  const [imageGeneratedAt, setImageGeneratedAt] = useState<Date | null>(null);
+  const [timeAgoText, setTimeAgoText] = useState<string>('');
   const [hasKey, setHasKey] = useState(false);
+  const [backgroundIconIndex, setBackgroundIconIndex] = useState(0);
 
   const { transcript, startListening, stopListening, reset: resetSpeech } = useSpeechRecognition();
-  const { saveNewImage } = useImageArchive();
+  const { saveNewImage, removeImage } = useImageArchive();
 
   // Check for API key when screen comes into focus (including returning from settings)
   useFocusEffect(
@@ -55,6 +74,20 @@ export default function HomeScreen() {
     }
   }, [transcript]);
 
+  // Update time ago text every 30 seconds
+  useEffect(() => {
+    if (!imageGeneratedAt) return;
+
+    const updateTimeAgo = () => {
+      setTimeAgoText(getTimeAgo(imageGeneratedAt));
+    };
+
+    updateTimeAgo();
+    const interval = setInterval(updateTimeAgo, 30000);
+
+    return () => clearInterval(interval);
+  }, [imageGeneratedAt]);
+
   const handlePressIn = useCallback(async () => {
     if (!hasKey) {
       router.push('/settings');
@@ -65,13 +98,19 @@ export default function HomeScreen() {
     setAppStatus('listening');
     setStatusMessage('Listening...');
     setCurrentImage(null);
+    setCurrentPrompt(null);
+    setImageGeneratedAt(null);
     await startListening();
   }, [hasKey, startListening]);
 
   const handlePressOut = useCallback(async () => {
+    // Add a 1.5 second buffer before stopping so the last word doesn't get cut off
+    setStatusMessage('Listening...');
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
     stopListening();
 
-    // Wait a moment for final transcript
+    // Wait a moment for final transcript to process
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Check if we have a transcript to process
@@ -80,7 +119,7 @@ export default function HomeScreen() {
       setStatusMessage('No speech detected. Try again!');
       setTimeout(() => {
         setAppStatus('idle');
-        setStatusMessage('Press the button and tell Sticker Lizard what to draw!');
+        setStatusMessage('Press and hold the button and tell the Sticker Lizard what to draw!');
         resetSpeech();
       }, 2000);
       return;
@@ -94,7 +133,7 @@ export default function HomeScreen() {
       setStatusMessage('Cancelled!');
       setTimeout(() => {
         setAppStatus('idle');
-        setStatusMessage('Press the button and tell Sticker Lizard what to draw!');
+        setStatusMessage('Press and hold the button and tell the Sticker Lizard what to draw!');
         resetSpeech();
       }, 2000);
       return;
@@ -114,17 +153,23 @@ export default function HomeScreen() {
       Alert.alert('Error', result.error || 'Failed to generate image');
       setTimeout(() => {
         setAppStatus('idle');
-        setStatusMessage('Press the button and tell Sticker Lizard what to draw!');
+        setStatusMessage('Press and hold the button and tell the Sticker Lizard what to draw!');
         resetSpeech();
       }, 3000);
       return;
     }
 
     // Save to archive
-    await saveNewImage(result.base64, transcript);
+    const savedImage = await saveNewImage(result.base64, transcript);
 
-    // Display the image
-    setCurrentImage(`data:image/png;base64,${result.base64}`);
+    // Cycle to next background icon
+    setBackgroundIconIndex(prev => (prev + 1) % BACKGROUND_ICONS.length);
+
+    // Display the image with metadata
+    setCurrentImage(savedImage.uri);
+    setCurrentImageId(savedImage.id);
+    setCurrentPrompt(transcript);
+    setImageGeneratedAt(new Date());
     setStatusMessage(`"${transcript}"`);
 
     // Print the image
@@ -136,14 +181,35 @@ export default function HomeScreen() {
       setAppStatus('success');
       setTimeout(() => {
         setAppStatus('idle');
-        setStatusMessage('Press the button and tell Sticker Lizard what to draw!');
+        setStatusMessage('Press and hold the button and tell the Sticker Lizard what to draw!');
         resetSpeech();
       }, 3000);
     } else {
-      setAppStatus('error');
-      setStatusMessage('Print failed. You can print again from Archive.');
+      // Print was cancelled or failed - show friendly message via toast
+      // but keep the original prompt displayed
+      playFinishedSound(); // Still play success sound since image was created
+      setAppStatus('success');
+
+      // Show toast about print status
+      if (printResult.error === 'cancelled') {
+        Alert.alert(
+          'Image Saved!',
+          "Print was skipped, but we've saved this image to My Stickers.",
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Image Saved!',
+          "No printer found, so we've saved this image to My Stickers.",
+          [{ text: 'OK' }]
+        );
+      }
+
+      // Keep showing the original prompt
+      setStatusMessage(`"${transcript}"`);
       setTimeout(() => {
         setAppStatus('idle');
+        setStatusMessage('Press and hold the button and tell the Sticker Lizard what to draw!');
         resetSpeech();
       }, 3000);
     }
@@ -151,57 +217,93 @@ export default function HomeScreen() {
 
   const isProcessing = appStatus === 'processing';
 
+  const handleDeleteCurrentImage = useCallback(async (id: string) => {
+    await removeImage(id);
+    setCurrentImage(null);
+    setCurrentImageId(null);
+    setCurrentPrompt(null);
+    setImageGeneratedAt(null);
+  }, [removeImage]);
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        {/* Status Message */}
-        <View style={styles.messageContainer}>
-          <Text style={styles.message}>{statusMessage}</Text>
-        </View>
+    <View style={styles.container}>
+      {/* Animated Background */}
+      <AnimatedIconBackground
+        icon={BACKGROUND_ICONS[backgroundIconIndex]}
+        backgroundColor="#FFB3D9"
+        iconOpacity={0.1}
+        speed={5000}
+      />
 
-        {/* Main Button */}
-        <DreamButton
-          status={appStatus}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          disabled={isProcessing}
-        />
+      <SafeAreaView style={styles.safeArea}>
+        {/* Settings button - top right, subtle */}
+        <Pressable
+          style={styles.settingsButton}
+          onPress={() => router.push('/settings')}
+        >
+          <Text style={styles.settingsButtonText}>⚙️</Text>
+        </Pressable>
 
-        {/* Generated Image Preview */}
-        {currentImage && (
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: currentImage }}
-              style={styles.image}
-              resizeMode="contain"
-            />
+        <View style={styles.content}>
+          {/* Status Message */}
+          <View style={styles.messageContainer}>
+            <Text style={styles.message}>{statusMessage}</Text>
           </View>
-        )}
 
-        {/* Navigation Buttons */}
-        <View style={styles.navButtons}>
-          <Pressable
-            style={styles.navButton}
-            onPress={() => router.push('/archive')}
-          >
-            <Text style={styles.navButtonText}>My Stickers</Text>
-          </Pressable>
-          <Pressable
-            style={styles.navButton}
-            onPress={() => router.push('/settings')}
-          >
-            <Text style={styles.navButtonText}>Settings</Text>
-          </Pressable>
+          {/* Main Button */}
+          <DreamButton
+            status={appStatus}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            disabled={isProcessing}
+          />
+
+          {/* Generated Image Preview */}
+          {currentImage && (
+            <View style={styles.imageCard}>
+              <View style={styles.imageCardContent}>
+                <View style={styles.imageCardInfo}>
+                  {currentPrompt && (
+                    <Text style={styles.imageCardPrompt}>Last photo: {'\n'} {currentPrompt}</Text>
+                  )}
+                  <Text style={styles.imageCardTime}>{timeAgoText}</Text>
+                </View>
+                <View style={styles.imageContainer}>
+                  <Image
+                    source={{ uri: currentImage }}
+                    style={styles.image}
+                    resizeMode="contain"
+                  />
+                </View>
+              </View>
+              <ImageActions
+                imageUri={currentImage}
+                imageId={currentImageId ?? undefined}
+                onDelete={handleDeleteCurrentImage}
+                showDelete={true}
+              />
+            </View>
+          )}
         </View>
-      </View>
-    </SafeAreaView>
+
+        {/* My Stickers button - full width at bottom */}
+        <Pressable
+          style={styles.myStickersButton}
+          onPress={() => router.push('/archive')}
+        >
+          <Text style={styles.myStickersButtonText}>🖼️ My Stickers</Text>
+        </Pressable>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFB3D9',
+  },
+  safeArea: {
+    flex: 1,
   },
   content: {
     flex: 1,
@@ -212,7 +314,7 @@ const styles = StyleSheet.create({
   messageContainer: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    borderWidth: 2,
+    borderWidth: 0,
     borderColor: '#2d2d2d',
     padding: 16,
     marginBottom: 30,
@@ -226,36 +328,67 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  imageContainer: {
+  imageCard: {
     marginTop: 30,
-    width: '60%',
-    aspectRatio: 9 / 16,
-    borderRadius: 12,
-    borderWidth: 2,
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 3,
     borderColor: '#2d2d2d',
     overflow: 'hidden',
+  },
+  imageCardContent: {
+    flexDirection: 'row',
+  },
+  imageCardInfo: {
+    width: '60%',
+    padding: 12,
+    justifyContent: 'center',
+  },
+  imageCardPrompt: {
+    fontSize: 14,
+    color: '#2d2d2d',
+    fontStyle: 'italic',
+    marginBottom: 4,
+  },
+  imageCardTime: {
+    fontSize: 12,
+    color: '#666',
+  },
+  imageContainer: {
+    width: '60%',
+    position: 'relative',
+    left: '-6%',
+    aspectRatio: 1,
     backgroundColor: '#fff',
   },
   image: {
     width: '100%',
     height: '100%',
   },
-  navButtons: {
-    flexDirection: 'row',
+  settingsButton: {
     position: 'absolute',
-    bottom: 30,
-    gap: 20,
+    top: 60,
+    right: 20,
+    padding: 8,
+    opacity: 0.5,
+    zIndex: 10,
   },
-  navButton: {
+  settingsButtonText: {
+    fontSize: 20,
+  },
+  myStickersButton: {
     backgroundColor: '#fff',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 2,
+    paddingVertical: 16,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    borderRadius: 12,
+    borderWidth: 3,
     borderColor: '#2d2d2d',
+    alignItems: 'center',
   },
-  navButtonText: {
-    fontSize: 16,
+  myStickersButtonText: {
+    fontSize: 18,
     fontWeight: '600',
     color: '#2d2d2d',
   },

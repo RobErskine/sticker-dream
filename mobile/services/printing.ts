@@ -58,16 +58,20 @@ export async function printImage(base64Data: string): Promise<PrintResult> {
 
     return { success: true };
   } catch (error) {
-    console.error('Print error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log('Print not completed:', errorMessage);
 
-    // User cancelled print dialog is not really an error
-    if (error instanceof Error && error.message.includes('cancel')) {
-      return { success: true }; // User cancelled, but not an error
+    // User cancelled or dismissed print dialog - not an error
+    if (errorMessage.includes('cancel') || errorMessage.includes('did not complete')) {
+      return {
+        success: false,
+        error: 'cancelled',
+      };
     }
 
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to print',
+      error: errorMessage,
     };
   }
 }

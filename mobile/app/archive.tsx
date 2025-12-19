@@ -7,13 +7,14 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ImageCard } from '../components/ImageCard';
 import { useImageArchive } from '../hooks/useImageArchive';
 
 export default function ArchiveScreen() {
   const { images, loading, removeImage, refreshImages } = useImageArchive();
   const [refreshing, setRefreshing] = React.useState(false);
+  const insets = useSafeAreaInsets();
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -38,7 +39,7 @@ export default function ArchiveScreen() {
         <View style={styles.centered}>
           <Text style={styles.emptyTitle}>No Stickers Yet!</Text>
           <Text style={styles.emptyText}>
-            Press the button on the home screen{'\n'}and imagine a sticker to get started.
+            Press and hold the button on the home screen{'\n'}, imagine a sticker, and speak it out loud!
           </Text>
         </View>
       </SafeAreaView>
@@ -46,10 +47,14 @@ export default function ArchiveScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 16 }
+        ]}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -61,15 +66,17 @@ export default function ArchiveScreen() {
         <Text style={styles.subtitle}>
           Stickers from the last 7 days ({images.length})
         </Text>
-        {images.map((image) => (
-          <ImageCard
-            key={image.id}
-            image={image}
-            onDelete={removeImage}
-          />
-        ))}
+        <View style={styles.grid}>
+          {images.map((image) => (
+            <ImageCard
+              key={image.id}
+              image={image}
+              onDelete={removeImage}
+            />
+          ))}
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -106,6 +113,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   subtitle: {
     fontSize: 14,

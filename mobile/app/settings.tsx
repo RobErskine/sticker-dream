@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -21,6 +22,7 @@ export default function SettingsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasExistingKey, setHasExistingKey] = useState(false);
+  const [isApiKeyExpanded, setIsApiKeyExpanded] = useState(false);
 
   useEffect(() => {
     loadExistingKey();
@@ -65,6 +67,7 @@ export default function SettingsScreen() {
       // Save the key
       await saveApiKey(apiKey.trim());
       setHasExistingKey(true);
+      setIsApiKeyExpanded(false);
 
       Alert.alert(
         'Success!',
@@ -81,7 +84,7 @@ export default function SettingsScreen() {
 
   const handleDelete = () => {
     Alert.alert(
-      'Delete API Key',
+      '❌ Delete API Key',
       'Are you sure you want to remove your API key?',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -92,6 +95,7 @@ export default function SettingsScreen() {
             await deleteApiKey();
             setApiKey('');
             setHasExistingKey(false);
+            setIsApiKeyExpanded(false);
             Alert.alert('Deleted', 'Your API key has been removed.');
           },
         },
@@ -121,51 +125,99 @@ export default function SettingsScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Gemini API Key</Text>
-            <Text style={styles.sectionDescription}>
-              Enter your Google Gemini API key to generate stickers.
-              You can get one at{' '}
-              <Text style={styles.link}>ai.google.dev</Text>
-            </Text>
+            {hasExistingKey ? (
+              <>
+                {/* Collapsed state - show status and expand button */}
+                <Pressable
+                  style={styles.accordionHeader}
+                  onPress={() => setIsApiKeyExpanded(!isApiKeyExpanded)}
+                >
+                  <View>
+                    <Text style={styles.sectionTitle}>Gemini API Key</Text>
+                    <Text style={styles.statusText}>✓ API key configured</Text>
+                  </View>
+                  <Text style={styles.accordionArrow}>
+                    {isApiKeyExpanded ? '▲' : '▼'}
+                  </Text>
+                </Pressable>
 
-            <TextInput
-              style={styles.input}
-              value={apiKey}
-              onChangeText={setApiKey}
-              placeholder="Enter your API key"
-              placeholderTextColor="#999"
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry={hasExistingKey}
-            />
+                {/* Expanded content */}
+                {isApiKeyExpanded && (
+                  <View style={styles.accordionContent}>
+                    <Text style={styles.sectionDescription}>
+                      Your API key is saved. You can update or remove it below.
+                    </Text>
 
-            <Pressable
-              style={[styles.button, isSaving && styles.buttonDisabled]}
-              onPress={handleSave}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  {hasExistingKey ? 'Update API Key' : 'Save API Key'}
+                    <TextInput
+                      style={styles.input}
+                      value={apiKey}
+                      onChangeText={setApiKey}
+                      placeholder="Enter your API key"
+                      placeholderTextColor="#999"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      secureTextEntry={true}
+                    />
+
+                    <Pressable
+                      style={[styles.button, isSaving && styles.buttonDisabled]}
+                      onPress={handleSave}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.buttonText}>Update API Key</Text>
+                      )}
+                    </Pressable>
+
+                    <Pressable style={styles.deleteButton} onPress={handleDelete}>
+                      <Text style={styles.deleteButtonText}>Remove API Key</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                {/* No key - show full form */}
+                <Text style={styles.sectionTitle}>Gemini API Key</Text>
+                <Text style={styles.sectionDescription}>
+                  Enter your Google Gemini API key to generate stickers.
+                  You can get one at{' '}
+                  <Text style={styles.link}>ai.google.dev</Text>
                 </Text>
-              )}
-            </Pressable>
 
-            {hasExistingKey && (
-              <Pressable style={styles.deleteButton} onPress={handleDelete}>
-                <Text style={styles.deleteButtonText}>Remove API Key</Text>
-              </Pressable>
+                <TextInput
+                  style={styles.input}
+                  value={apiKey}
+                  onChangeText={setApiKey}
+                  placeholder="Enter your API key"
+                  placeholderTextColor="#999"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <Pressable
+                  style={[styles.button, isSaving && styles.buttonDisabled]}
+                  onPress={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Save API Key</Text>
+                  )}
+                </Pressable>
+              </>
             )}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
             <Text style={styles.aboutText}>
-              Picture Wizard turns your voice into coloring pages!
+              Picture Wizard turns your voice into coloring sticker pages!
               Press and hold the button, tell Sticker Lizard what you want to draw,
-              and watch as he creates a unique coloring page just for you.
+              and watch as he creates a unique sticker just for you.
             </Text>
             <Text style={styles.version}>Version 1.0.0</Text>
           </View>
@@ -201,6 +253,26 @@ const styles = StyleSheet.create({
     borderColor: '#2d2d2d',
     padding: 20,
     marginBottom: 20,
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  accordionArrow: {
+    fontSize: 16,
+    color: '#666',
+  },
+  accordionContent: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  statusText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    marginTop: 4,
   },
   sectionTitle: {
     fontSize: 20,
